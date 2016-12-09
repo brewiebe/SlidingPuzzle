@@ -3,4 +3,5 @@
     <string name="newPuzzleString">New Puzzle</string>
     <string name="solvePuzzleString">Solve Puzzle</string>
     <string name="movesString">Moves so far: </string>
+    <string name="gameWon">You Won!!!</string>
 </resources>

@@ -8,19 +8,36 @@ import android.graphics.drawable.GradientDrawable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
     ImageView imageView;
     GridLayout gridLayout;
     SquareImageView[][] gameState;
+    int moves;
+    TextView movesTextView;
+    TextView messageTextView;
+    Button solveButton;
+    Button newGameButton;
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putSerializable("GameState", this.gameState);
+        outState.putSerializable("Moves", this.moves);
+
+        super.onSaveInstanceState(outState);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,20 +50,75 @@ public class MainActivity extends AppCompatActivity {
         imageView.setImageResource(R.drawable.drwhosquare);
         imageView.setAdjustViewBounds(true);
 
+        movesTextView = (TextView) findViewById(R.id.movesNumberTextView);
+        messageTextView = (TextView) findViewById(R.id.messageTextView);
 
-        ViewTreeObserver vto = gridLayout.getViewTreeObserver();
-        vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-                gridLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                int width  = gridLayout.getMeasuredWidth();
-                int height = gridLayout.getMeasuredHeight();
+        solveButton = (Button) findViewById(R.id.solvePuzzleButton);
+        solveButton.setOnClickListener(new OnClickSolve());
+        solveButton.setEnabled(false);
 
-                ArrayList<ArrayList<Bitmap>> slicedImages = sliceImage(4);
-                addImagesToGridLayout(slicedImages, 4);
+        newGameButton = (Button) findViewById(R.id.newPuzzleButton);
+        newGameButton.setOnClickListener(new OnClickNewGame());
+
+        if(savedInstanceState == null) {
+            ViewTreeObserver vto = gridLayout.getViewTreeObserver();
+            vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    gridLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    ArrayList<ArrayList<Bitmap>> slicedImages = sliceImage(4);
+                    addImagesToGridLayout(slicedImages, 4);
+                }
+            });
+        } else {
+            final SquareImageView[][] oldGameState = (SquareImageView[][]) savedInstanceState.getSerializable("GameState");
+            this.moves = (int) savedInstanceState.getSerializable("Moves");
+
+            ViewTreeObserver vto = gridLayout.getViewTreeObserver();
+            vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    gridLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    gridLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    ArrayList<ArrayList<Bitmap>> slicedImages = sliceImage(4);
+                    addImagesToGridLayout(slicedImages, 4);
+
+                    initializeGridLayout(oldGameState);
+                    movesTextView.setText(String.valueOf(moves));
+                }
+            });
+        }
+    }
+
+    private void initializeGridLayout(SquareImageView[][] oldGameState) {
+        SquareImageView[][] initializedGameState = new SquareImageView[oldGameState.length][oldGameState.length];
+
+        for(int i = 0; i < gameState.length; i++){
+            for(int j = 0; j < gameState.length; j++) {
+                SquareImageView origLocation = getOriginal(i, j, oldGameState);
+
+                initializedGameState[i][j] = gameState[origLocation.getColumn()][origLocation.getRow()];
+                initializedGameState[i][j].setColumn(i);
+                initializedGameState[i][j].setRow(j);
+
+                gridLayout.removeView(initializedGameState[i][j]);
+                gridLayout.addView(initializedGameState[i][j], new GridLayout.LayoutParams(GridLayout.spec(j), GridLayout.spec(i)));
             }
-        });
+        }
 
+        this.gameState = initializedGameState;
+    }
+
+    private SquareImageView getOriginal(int column, int row, SquareImageView[][] oldGameState) {
+        for(int i = 0; i < gameState.length; i++){
+            for(int j = 0; j < gameState.length; j++) {
+                if (oldGameState[i][j].getOrigColumn() == column && oldGameState[i][j].getOrigRow() == row) {
+                    return oldGameState[i][j];
+                }
+            }
+        }
+
+        return null;
     }
 
     private void addImagesToGridLayout(ArrayList<ArrayList<Bitmap>> slicedImages, int squares) {
@@ -63,7 +135,6 @@ public class MainActivity extends AppCompatActivity {
                 if ((i == squares - 1) && (y == squares - 1)) {
                     //set last square to blank image
                     slicedView.setMinimumWidth(imageWidth - 2);
-                    slicedView.setMinimumHeight(imageWidth - 2);
                     slicedView.setBackgroundColor(Color.WHITE);
                     slicedView.setBlankImage(true);
                 } else {
@@ -95,24 +166,140 @@ public class MainActivity extends AppCompatActivity {
             SquareImageView squareSwap = getAdjacentBlankSquare(square);
 
             if(squareSwap != null) {
-                int row = square.getRow();
-                int col = square.getColumn();
-
-                square.setRow(squareSwap.getRow());
-                square.setColumn(squareSwap.getColumn());
-                gameState[squareSwap.getColumn()][squareSwap.getRow()] = square;
-
-                squareSwap.setRow(row);
-                squareSwap.setColumn(col);
-                gameState[col][row] = squareSwap;
-
-                gridLayout.removeView(squareSwap);
-                gridLayout.removeView(square);
-                gridLayout.addView(square, new GridLayout.LayoutParams(GridLayout.spec(square.getRow()), GridLayout.spec(square.getColumn())));
-                gridLayout.addView(squareSwap, new GridLayout.LayoutParams(GridLayout.spec(squareSwap.getRow()), GridLayout.spec(squareSwap.getColumn())));
+                moves ++;
+                swap(square, squareSwap);
+                movesTextView.setText(String.valueOf(moves));
+                messageTextView.setText(" ");
+                checkWin();
+            } else {
+                messageTextView.setText("Illegal Move");
             }
         }
     }
+
+    private class OnClickSolve implements View.OnClickListener {
+
+        @Override
+        public void onClick(View v) {
+                solvePuzzle();
+                moves = 0;
+                movesTextView.setText(String.valueOf(moves));
+                solveButton.setEnabled(false);
+        }
+    }
+
+    private class OnClickNewGame implements View.OnClickListener {
+
+        @Override
+        public void onClick(View v) {
+            solvePuzzle();
+            scrambleGame();
+            moves = 0;
+            movesTextView.setText(String.valueOf(moves));
+            solveButton.setEnabled(true);
+        }
+    }
+
+    private void scrambleGame() {
+        while(anyTileIsAtOriginal()) {
+            makeRandomMove();
+        }
+    }
+
+    private boolean anyTileIsAtOriginal(){
+        for(int i = 0; i < gameState.length; i++){
+            for(int j = 0; j < gameState.length; j++){
+                if(gameState[i][j].getColumn() == gameState[i][j].getOrigColumn() && gameState[i][j].getRow() == gameState[i][j].getOrigRow()){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void makeRandomMove() {
+        SquareImageView blankSquare = getBlankSquare();
+        if (blankSquare != null) {
+            ArrayList<SquareImageView> adjacentTiles = getAdjacentSquares(blankSquare);
+            Random random = new Random();
+            SquareImageView toSwap = adjacentTiles.get(random.nextInt(adjacentTiles.size()));
+            swap(blankSquare, toSwap);
+        }
+    }
+
+    private SquareImageView getBlankSquare() {
+        for(int i = 0; i < gameState.length; i++) {
+            for (int j = 0; j < gameState[i].length; j++){
+                if(gameState[i][j].isBlankImage()){
+                    return gameState[i][j];
+                }
+            }
+        }
+        return null;
+    }
+
+
+    private void solvePuzzle() {
+        while(!gameIsWon()){
+            swapToCorrectPositions();
+        }
+    }
+
+    private void swapToCorrectPositions() {
+        for(int i = 0; i < gameState.length; i++){
+            for(int j = 0; j < gameState.length; j++){
+                if(gameState[i][j].getColumn() != gameState[i][j].getOrigColumn() || gameState[i][j].getRow() != gameState[i][j].getOrigRow()){
+                    int origColumn = gameState[i][j].getOrigColumn();
+                    int origRow = gameState[i][j].getOrigRow();
+                    swap(gameState[i][j], gameState[origColumn][origRow]);
+                }
+            }
+        }
+    }
+
+    private void swap(SquareImageView square, SquareImageView squareSwap) {
+        if (square.getRow() == squareSwap.getRow() && square.getColumn() == squareSwap.getColumn()) {
+            //do nothing, same square
+        } else {
+            int row = square.getRow();
+            int col = square.getColumn();
+
+            square.setRow(squareSwap.getRow());
+            square.setColumn(squareSwap.getColumn());
+            gameState[squareSwap.getColumn()][squareSwap.getRow()] = square;
+
+            squareSwap.setRow(row);
+            squareSwap.setColumn(col);
+            gameState[col][row] = squareSwap;
+
+            gridLayout.removeView(squareSwap);
+            gridLayout.removeView(square);
+            gridLayout.addView(square, new GridLayout.LayoutParams(GridLayout.spec(square.getRow()), GridLayout.spec(square.getColumn())));
+            gridLayout.addView(squareSwap, new GridLayout.LayoutParams(GridLayout.spec(squareSwap.getRow()), GridLayout.spec(squareSwap.getColumn())));
+
+        }
+    }
+
+    private void checkWin() {
+        if (gameIsWon()) {
+            messageTextView.setText(R.string.gameWon);
+        } else {
+            messageTextView.setText(" ");
+        }
+    }
+
+    private boolean gameIsWon() {
+        for(int i = 0; i < gameState.length; i++){
+            for(int j = 0; j < gameState.length; j++){
+                if(gameState[i][j].getColumn() != gameState[i][j].getOrigColumn() || gameState[i][j].getRow() != gameState[i][j].getOrigRow()){
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
 
     private SquareImageView getAdjacentBlankSquare(SquareImageView square) {
         int col = square.getColumn();
@@ -133,6 +320,35 @@ public class MainActivity extends AppCompatActivity {
 
         return null;
     }
+
+    private ArrayList<SquareImageView> getAdjacentSquares(SquareImageView square) {
+        int col = square.getColumn();
+        int row = square.getRow();
+
+        int colSize = gameState[col].length - 1;
+        int rowSize = gameState.length - 1;
+
+        ArrayList<SquareImageView> adjacentSquares = new ArrayList<>();
+
+        if (col > 0) {
+            adjacentSquares.add(gameState[col - 1][row]);
+        }
+
+        if (col + 1 <= colSize) {
+            adjacentSquares.add(gameState[col + 1][row]);
+        }
+
+        if (row > 0) {
+            adjacentSquares.add(gameState[col][row - 1]);
+        }
+
+        if (row + 1 <= rowSize) {
+            adjacentSquares.add(gameState[col][row + 1]);
+        }
+
+        return adjacentSquares;
+    }
+
 
     private ArrayList<ArrayList<Bitmap>> sliceImage(int squares) {
         Bitmap bitmapImage = ((BitmapDrawable)imageView.getDrawable()).getBitmap();

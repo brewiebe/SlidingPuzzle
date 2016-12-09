@@ -3,11 +3,13 @@ package com.cosc341.bre.slidingpuzzle;
 import android.content.Context;
 import android.widget.ImageView;
 
+import java.io.Serializable;
+
 /**
  * Created by Bre on 2016-12-08.
  */
 
-public class SquareImageView extends ImageView {
+public class SquareImageView extends ImageView implements Serializable {
     public int getColumn() {
         return column;
     }
