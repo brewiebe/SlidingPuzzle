@@ -20,7 +20,7 @@ public class MainActivity extends AppCompatActivity {
 
     ImageView imageView;
     GridLayout gridLayout;
-    ArrayList<ArrayList<SquareImageView>> gameState;
+    SquareImageView[][] gameState;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,10 +51,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void addImagesToGridLayout(ArrayList<ArrayList<Bitmap>> slicedImages, int squares) {
         int imageWidth = gridLayout.getMeasuredWidth() / squares;
-        ArrayList<ArrayList<SquareImageView>> gameState = new ArrayList<>();
+        SquareImageView[][] gameState = new SquareImageView[squares][squares];
 
         for(int i = 0; i < squares; i++) {
-            ArrayList<SquareImageView> column = new ArrayList<>();
+            SquareImageView[] column = new SquareImageView[squares];
             for (int y = 0; y < squares; y++) {
                 SquareImageView slicedView = new SquareImageView(getApplicationContext(), y, i);
                 Drawable slicedDrawable = new BitmapDrawable(getResources(), slicedImages.get(i).get(y));
@@ -80,9 +80,9 @@ public class MainActivity extends AppCompatActivity {
                 slicedView.setOnClickListener(new OnClickSquare());
                 gridLayout.addView(slicedView, params);
 
-                column.add(slicedView);
+                column[y] = slicedView;
             }
-            gameState.add(column);
+            gameState[i] = column;
         }
         this.gameState = gameState;
     }
@@ -92,15 +92,46 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onClick(View v) {
             SquareImageView square = (SquareImageView) v;
+            SquareImageView squareSwap = getAdjacentBlankSquare(square);
 
-            //swap
-            SquareImageView squareSwap = gameState.get(square.getColumn() - 1).get(square.getRow() - 1);
+            if(squareSwap != null) {
+                int row = square.getRow();
+                int col = square.getColumn();
 
-            gridLayout.removeView(squareSwap);
-            gridLayout.removeView(square);
-            gridLayout.addView(square, new GridLayout.LayoutParams(GridLayout.spec(squareSwap.getRow()), GridLayout.spec(squareSwap.getColumn())));
-            gridLayout.addView(squareSwap, new GridLayout.LayoutParams(GridLayout.spec(square.getRow()), GridLayout.spec(square.getColumn())));
+                square.setRow(squareSwap.getRow());
+                square.setColumn(squareSwap.getColumn());
+                gameState[squareSwap.getColumn()][squareSwap.getRow()] = square;
+
+                squareSwap.setRow(row);
+                squareSwap.setColumn(col);
+                gameState[col][row] = squareSwap;
+
+                gridLayout.removeView(squareSwap);
+                gridLayout.removeView(square);
+                gridLayout.addView(square, new GridLayout.LayoutParams(GridLayout.spec(square.getRow()), GridLayout.spec(square.getColumn())));
+                gridLayout.addView(squareSwap, new GridLayout.LayoutParams(GridLayout.spec(squareSwap.getRow()), GridLayout.spec(squareSwap.getColumn())));
+            }
         }
+    }
+
+    private SquareImageView getAdjacentBlankSquare(SquareImageView square) {
+        int col = square.getColumn();
+        int row = square.getRow();
+
+        int colSize = gameState[col].length - 1;
+        int rowSize = gameState.length - 1;
+
+        if (col > 0 && gameState[col - 1][row].isBlankImage()) {
+            return gameState[col - 1][row];
+        } else if (col + 1 <= colSize && gameState[col + 1][row].isBlankImage()) {
+            return gameState[col + 1][row];
+        } else if (row > 0 && gameState[col][row - 1].isBlankImage()) {
+            return gameState[col][row - 1];
+        } else if (row + 1 <= rowSize && gameState[col][row + 1].isBlankImage()) {
+            return gameState[col][row + 1];
+        }
+
+        return null;
     }
 
     private ArrayList<ArrayList<Bitmap>> sliceImage(int squares) {

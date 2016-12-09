@@ -33,13 +33,25 @@ public class SquareImageView extends ImageView {
     }
 
     private int column;
+    private int origColumn;
     private int row;
+    private int origRow;
     private boolean blankImage;
 
     public SquareImageView(Context context, int row, int column) {
         super(context);
         this.row = row;
+        this.origRow = row;
         this.column = column;
+        this.origColumn = column;
         this.blankImage = false;
+    }
+
+    public int getOrigColumn() {
+        return origColumn;
+    }
+
+    public int getOrigRow() {
+        return origRow;
     }
 }
